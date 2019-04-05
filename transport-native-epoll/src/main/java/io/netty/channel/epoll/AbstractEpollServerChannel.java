@@ -116,7 +116,7 @@ public abstract class AbstractEpollServerChannel extends AbstractEpollChannel im
                         }
                         allocHandle.incMessagesRead(1);
 
-                        readPending = false;
+                        allocHandle.setReadPending(false);
                         pipeline.fireChannelRead(newChildChannel(allocHandle.lastBytesRead(), acceptedAddress, 1,
                                                                  acceptedAddress[0]));
                     } while (allocHandle.continueReading());

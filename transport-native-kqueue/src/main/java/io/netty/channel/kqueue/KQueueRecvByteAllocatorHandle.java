@@ -40,6 +40,7 @@ final class KQueueRecvByteAllocatorHandle implements RecvByteBufAllocator.Extend
     private boolean overrideGuess;
     private boolean readEOF;
     private long numberBytesPending;
+    private boolean readPending;
 
     KQueueRecvByteAllocatorHandle(RecvByteBufAllocator.ExtendedHandle handle) {
         delegate = ObjectUtil.checkNotNull(handle, "handle");
@@ -97,13 +98,21 @@ final class KQueueRecvByteAllocatorHandle implements RecvByteBufAllocator.Extend
 
     @Override
     public boolean continueReading(UncheckedBooleanSupplier maybeMoreDataSupplier) {
-        return delegate.continueReading(maybeMoreDataSupplier);
+        return (readPending && maybeMoreDataToRead()) || delegate.continueReading(maybeMoreDataSupplier);
     }
 
     @Override
     public boolean continueReading() {
         // We must override the supplier which determines if there maybe more data to read.
-        return delegate.continueReading(defaultMaybeMoreDataSupplier);
+        return continueReading(defaultMaybeMoreDataSupplier);
+    }
+
+    void setReadPending(boolean readPending) {
+        this.readPending = readPending;
+    }
+
+    boolean isReadPending() {
+        return readPending;
     }
 
     void readEOF() {

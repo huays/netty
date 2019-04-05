@@ -35,11 +35,10 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 public class SocketAutoReadTest extends AbstractSocketTest {
-    @Test
+    @Test(timeout = 10000)
     public void testAutoReadOffDuringReadOnlyReadsOneTime() throws Throwable {
         run();
     }
@@ -117,14 +116,14 @@ public class SocketAutoReadTest extends AbstractSocketTest {
     }
 
     private static final class AutoReadHandler extends ChannelInboundHandlerAdapter {
-        private final AtomicInteger count = new AtomicInteger();
+        private AtomicInteger count = new AtomicInteger();
+        private final AtomicInteger channelReadCompleteCount = new AtomicInteger();
+
         private final CountDownLatch latch = new CountDownLatch(1);
-        private final CountDownLatch latch2;
         private final boolean callRead;
 
         AutoReadHandler(boolean callRead) {
             this.callRead = callRead;
-            latch2 = new CountDownLatch(callRead ? 3 : 2);
         }
 
         @Override
@@ -141,8 +140,8 @@ public class SocketAutoReadTest extends AbstractSocketTest {
 
         @Override
         public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
+            channelReadCompleteCount.incrementAndGet();
             latch.countDown();
-            latch2.countDown();
         }
 
         void assertSingleRead() throws InterruptedException {
@@ -151,8 +150,16 @@ public class SocketAutoReadTest extends AbstractSocketTest {
         }
 
         void assertSingleReadSecondTry() throws InterruptedException {
-            assertTrue(latch2.await(5, TimeUnit.SECONDS));
-            assertEquals(callRead ? 3 : 2, count.get());
+            assertTrue(latch.await(5, TimeUnit.SECONDS));
+
+            int expected = callRead ? 3 : 2;
+
+            while (expected != count.get()) {
+                Thread.sleep(50);
+            }
+
+            int readCompleteCnt = channelReadCompleteCount.get();
+            assertTrue(readCompleteCnt > 0 && readCompleteCnt <= 3);
         }
     }
 

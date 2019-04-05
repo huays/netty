@@ -218,7 +218,7 @@ abstract class AbstractEpollChannel extends AbstractChannel implements UnixChann
     protected final void doBeginRead() throws Exception {
         // Channel.read() or ChannelHandlerContext.read() was called
         final AbstractEpollUnsafe unsafe = (AbstractEpollUnsafe) unsafe();
-        unsafe.readPending = true;
+        unsafe.recvBufAllocHandle().setReadPending(true);
 
         // We must set the read flag here as it is possible the user didn't read in the last read loop, the
         // executeEpollInReadyRunnable could read nothing, and if the user doesn't explicitly call read they will
@@ -256,7 +256,7 @@ abstract class AbstractEpollChannel extends AbstractChannel implements UnixChann
                 loop.execute(new Runnable() {
                     @Override
                     public void run() {
-                        if (!unsafe.readPending && !config().isAutoRead()) {
+                        if (!unsafe.recvBufAllocHandle().isReadPending() && !config().isAutoRead()) {
                             // Still no read triggered so clear it now
                             unsafe.clearEpollIn0();
                         }
@@ -375,7 +375,6 @@ abstract class AbstractEpollChannel extends AbstractChannel implements UnixChann
     }
 
     protected abstract class AbstractEpollUnsafe extends AbstractUnsafe {
-        boolean readPending;
         boolean maybeMoreDataToRead;
         private EpollRecvByteAllocatorHandle allocHandle;
         private final Runnable epollInReadyRunnable = new Runnable() {
@@ -398,7 +397,7 @@ abstract class AbstractEpollChannel extends AbstractChannel implements UnixChann
         final void epollInFinally(ChannelConfig config) {
             maybeMoreDataToRead = allocHandle.maybeMoreDataToRead();
 
-            if (allocHandle.isReceivedRdHup() || (readPending && maybeMoreDataToRead)) {
+            if (allocHandle.isReceivedRdHup() || (allocHandle.isReadPending() && maybeMoreDataToRead)) {
                 // trigger a read again as there may be something left to read and because of epoll ET we
                 // will not get notified again until we read everything from the socket
                 //
@@ -407,7 +406,7 @@ abstract class AbstractEpollChannel extends AbstractChannel implements UnixChann
                 // to false before every read operation to prevent re-entry into epollInReady() we will not read from
                 // the underlying OS again unless the user happens to call read again.
                 executeEpollInReadyRunnable(config);
-            } else if (!readPending && !config.isAutoRead()) {
+            } else if (!allocHandle.isReadPending() && !config.isAutoRead()) {
                 // Check if there is a readPending which was not processed yet.
                 // This could be for two reasons:
                 // * The user called Channel.read() or ChannelHandlerContext.read() in channelRead(...) method
@@ -534,7 +533,7 @@ abstract class AbstractEpollChannel extends AbstractChannel implements UnixChann
         protected final void clearEpollIn0() {
             assert eventLoop().inEventLoop();
             try {
-                readPending = false;
+                recvBufAllocHandle().setReadPending(false);
                 clearFlag(Native.EPOLLIN);
             } catch (IOException e) {
                 // When this happens there is something completely wrong with either the filedescriptor or epoll,

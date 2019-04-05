@@ -108,7 +108,7 @@ public abstract class AbstractKQueueServerChannel extends AbstractKQueueChannel 
                         allocHandle.lastBytesRead(1);
                         allocHandle.incMessagesRead(1);
 
-                        readPending = false;
+                        allocHandle.setReadPending(false);
                         pipeline.fireChannelRead(newChildChannel(acceptFd, acceptedAddress, 1,
                                                                  acceptedAddress[0]));
                     } while (allocHandle.continueReading());

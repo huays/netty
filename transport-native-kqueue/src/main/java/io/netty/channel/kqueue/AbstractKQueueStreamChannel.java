@@ -535,12 +535,12 @@ public abstract class AbstractKQueueStreamChannel extends AbstractKQueueChannel 
                         close = allocHandle.lastBytesRead() < 0;
                         if (close) {
                             // There is nothing left to read as we received an EOF.
-                            readPending = false;
+                            allocHandle.setReadPending(false);
                         }
                         break;
                     }
                     allocHandle.incMessagesRead(1);
-                    readPending = false;
+                    allocHandle.setReadPending(false);
                     pipeline.fireChannelRead(byteBuf);
                     byteBuf = null;
 
@@ -577,7 +577,7 @@ public abstract class AbstractKQueueStreamChannel extends AbstractKQueueChannel 
                                          KQueueRecvByteAllocatorHandle allocHandle) {
             if (byteBuf != null) {
                 if (byteBuf.isReadable()) {
-                    readPending = false;
+                    allocHandle.setReadPending(false);
                     pipeline.fireChannelRead(byteBuf);
                 } else {
                     byteBuf.release();

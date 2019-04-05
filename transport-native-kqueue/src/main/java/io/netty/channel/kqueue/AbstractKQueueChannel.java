@@ -156,7 +156,7 @@ abstract class AbstractKQueueChannel extends AbstractChannel implements UnixChan
     protected final void doBeginRead() throws Exception {
         // Channel.read() or ChannelHandlerContext.read() was called
         final AbstractKQueueUnsafe unsafe = (AbstractKQueueUnsafe) unsafe();
-        unsafe.readPending = true;
+        unsafe.recvBufAllocHandle().setReadPending(true);
 
         // We must set the read flag here as it is possible the user didn't read in the last read loop, the
         // executeReadReadyRunnable could read nothing, and if the user doesn't explicitly call read they will
@@ -306,7 +306,7 @@ abstract class AbstractKQueueChannel extends AbstractChannel implements UnixChan
                 loop.execute(new Runnable() {
                     @Override
                     public void run() {
-                        if (!unsafe.readPending && !config().isAutoRead()) {
+                        if (!unsafe.recvBufAllocHandle().isReadPending() && !config().isAutoRead()) {
                             // Still no read triggered so clear it now
                             unsafe.clearReadFilter0();
                         }
@@ -349,7 +349,6 @@ abstract class AbstractKQueueChannel extends AbstractChannel implements UnixChan
     }
 
     abstract class AbstractKQueueUnsafe extends AbstractUnsafe {
-        boolean readPending;
         boolean maybeMoreDataToRead;
         private KQueueRecvByteAllocatorHandle allocHandle;
         private final Runnable readReadyRunnable = new Runnable() {
@@ -375,7 +374,7 @@ abstract class AbstractKQueueChannel extends AbstractChannel implements UnixChan
         final void readReadyFinally(ChannelConfig config) {
             maybeMoreDataToRead = allocHandle.maybeMoreDataToRead();
 
-            if (allocHandle.isReadEOF() || (readPending && maybeMoreDataToRead)) {
+            if (allocHandle.isReadEOF() || (allocHandle.isReadPending() && maybeMoreDataToRead)) {
                 // trigger a read again as there may be something left to read and because of ET we
                 // will not get notified again until we read everything from the socket
                 //
@@ -384,7 +383,7 @@ abstract class AbstractKQueueChannel extends AbstractChannel implements UnixChan
                 // to false before every read operation to prevent re-entry into readReady() we will not read from
                 // the underlying OS again unless the user happens to call read again.
                 executeReadReadyRunnable(config);
-            } else if (!readPending && !config.isAutoRead()) {
+            } else if (!allocHandle.isReadPending() && !config.isAutoRead()) {
                 // Check if there is a readPending which was not processed yet.
                 // This could be for two reasons:
                 // * The user called Channel.read() or ChannelHandlerContext.read() in channelRead(...) method
@@ -502,7 +501,7 @@ abstract class AbstractKQueueChannel extends AbstractChannel implements UnixChan
         protected final void clearReadFilter0() {
             assert eventLoop().inEventLoop();
             try {
-                readPending = false;
+                recvBufAllocHandle().setReadPending(false);
                 readFilter(false);
             } catch (IOException e) {
                 // When this happens there is something completely wrong with either the filedescriptor or epoll,

@@ -172,7 +172,7 @@ public final class EpollDomainSocketChannel extends AbstractEpollStreamChannel i
                         return;
                     default:
                         allocHandle.incMessagesRead(1);
-                        readPending = false;
+                        allocHandle.setReadPending(false);
                         pipeline.fireChannelRead(new FileDescriptor(allocHandle.lastBytesRead()));
                         break;
                     }

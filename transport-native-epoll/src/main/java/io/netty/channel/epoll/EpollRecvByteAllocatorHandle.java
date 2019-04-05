@@ -35,6 +35,7 @@ class EpollRecvByteAllocatorHandle implements RecvByteBufAllocator.ExtendedHandl
     };
     private boolean isEdgeTriggered;
     private boolean receivedRdHup;
+    private boolean readPending;
 
     EpollRecvByteAllocatorHandle(RecvByteBufAllocator.ExtendedHandle handle) {
         delegate = ObjectUtil.checkNotNull(handle, "handle");
@@ -119,12 +120,20 @@ class EpollRecvByteAllocatorHandle implements RecvByteBufAllocator.ExtendedHandl
 
     @Override
     public final boolean continueReading(UncheckedBooleanSupplier maybeMoreDataSupplier) {
-        return delegate.continueReading(maybeMoreDataSupplier);
+        return (readPending && maybeMoreDataToRead()) || delegate.continueReading(maybeMoreDataSupplier);
     }
 
     @Override
     public final boolean continueReading() {
         // We must override the supplier which determines if there maybe more data to read.
-        return delegate.continueReading(defaultMaybeMoreDataSupplier);
+        return continueReading(defaultMaybeMoreDataSupplier);
+    }
+
+    final void setReadPending(boolean readPending) {
+        this.readPending = readPending;
+    }
+
+    final boolean isReadPending() {
+        return readPending;
     }
 }

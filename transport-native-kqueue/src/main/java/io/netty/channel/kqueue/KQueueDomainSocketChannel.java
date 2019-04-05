@@ -167,7 +167,7 @@ public final class KQueueDomainSocketChannel extends AbstractKQueueStreamChannel
                         default:
                             allocHandle.lastBytesRead(1);
                             allocHandle.incMessagesRead(1);
-                            readPending = false;
+                            allocHandle.setReadPending(false);
                             pipeline.fireChannelRead(new FileDescriptor(recvFd));
                             break;
                     }
